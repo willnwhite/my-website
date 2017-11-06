@@ -240,8 +240,8 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div []
-        [ div [] [ a [ href "mailto:w.white9@icloud.com" ] [ h2 [] [ text "email" ] ] ]
-        , div [] [ h2 [] [ text "pay" ] ]
+        [ div [] [ h3 [] [ a [ href "mailto:w.white9@icloud.com" ] [ text "email" ] ] ]
+        , div [] [ h3 [] [ text "pay" ] ]
         , div []
             (case model.ethereum of
                 False ->
