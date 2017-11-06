@@ -35,13 +35,15 @@ window.addEventListener("load", function() {
 
   // setInterval(() => app.ports.ethereum.send(typeof web3 !== "undefined"), 1000); // TODO Raise issue with MetaMask that this doesn't work because enabling MetaMask does not make it inject web3 unless the page is reloaded.
 
-  setInterval(
-    async () => {
-      const account = (await web3.eth.getAccounts())[0];
-      app.ports.selectedAccount.send(account === undefined ? null : account);
-    },
-    100 // 100 is from https://github.com/MetaMask/faq/blob/master/DEVELOPERS.md#ear-listening-for-selected-account-changes
-  );
+  if (typeof web3 !== "undefined") {
+    setInterval(
+      async () => {
+        const account = (await web3.eth.getAccounts())[0];
+        app.ports.selectedAccount.send(account === undefined ? null : account);
+      },
+      100 // 100 is from https://github.com/MetaMask/faq/blob/master/DEVELOPERS.md#ear-listening-for-selected-account-changes
+    );
+  }
 
   app.ports.getPercent.subscribe(async () => {
     const contract = new web3.eth.Contract(abi, contractAddress);
