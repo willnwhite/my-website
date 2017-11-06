@@ -1,0 +1,22 @@
+{
+  "name": "my-site",
+  "version": "1.0.0",
+  "description": "Will White's website",
+  "main": "n",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Will White",
+  "license": "ISC",
+  "devDependencies": {
+    "babel-core": "6.26.0",
+    "babel-polyfill": "6.26.0",
+    "babel-preset-env": "1.6.1",
+    "babelify": "8.0.0"
+  },
+  "dependencies": {
+    "big-rational": "0.10.7",
+    "solc": "0.4.18",
+    "web3": "1.0.0-beta.24"
+  }
+}

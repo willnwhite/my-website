@@ -1,0 +1,16 @@
+Y part:
+"Install MetaMask" and inputs disabled if MetaMask not installed.
+"Unlock MetaMask" and inputs disabled if MetaMask locked.
+Should donate to the in-put donee.
+Should pay the in-put amount.
+OK button (with Pay msg) shouldn't appear unless: amount is valid, donee is valid, payee isn't selected in MetaMask.
+No input fields should appear until percent is got.
+No input fields should appear unless percent is valid.
+"invalid address" if donee address is invalid.
+"invalid amount" if amount is invalid.
+"Payee can't pay payee" if payee account selected in MetaMask.
+receipt "transaction: signature: message:" after payment
+Can save receipt to file.
+
+rest of website:
+pay inputs only visible after clicking on pay.
