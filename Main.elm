@@ -270,10 +270,10 @@ view model =
                                                     fields percent
 
                                         Just Payee ->
-                                            fields percent ++ [ div [] [ text "Payee account selected in MetaMask. Switch account." ] ]
+                                            [ div [] [ text "Payee's account selected in MetaMask. Switch account." ] ] ++ fields percent
 
                                         Nothing ->
-                                            fields percent ++ [ div [] [ text "Unlock MetaMask" ] ]
+                                            [ div [] [ text "Unlock MetaMask" ] ] ++ fields percent
 
                                 Paying ->
                                     [ text "paying" ]
