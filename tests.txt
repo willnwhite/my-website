@@ -16,6 +16,7 @@ input field error msgs near input field
 can't donate to payee.
 "Cheaper to pay payee directly than to donate to them." when trying to donate to payee.
 percent refreshes when network changes in MetaMask
+"amount is invalid" if can't convert to Decimal
 
 rest of website:
 pay inputs only visible after clicking on pay.

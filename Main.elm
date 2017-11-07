@@ -3,6 +3,7 @@ port module Main exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Decimal as Dec exposing (Decimal)
 
 
 main =
@@ -25,8 +26,8 @@ type SelectedAccount
     | NonPayee
 
 
-type Valid
-    = Valid String
+type Valid a
+    = Valid a
     | Invalid String
 
 
@@ -40,8 +41,8 @@ type alias Model =
     , selectedAccount : Maybe SelectedAccount
     , percent : Maybe Float
     , payment : Payment
-    , amount : Maybe Float
-    , donee : Maybe Valid
+    , amount : Maybe { input : String, decimal : Valid Decimal }
+    , donee : Maybe (Valid String)
     }
 
 
@@ -84,7 +85,7 @@ port validAddress : ({ input : String, valid : Bool } -> msg) -> Sub msg
 port selectedAccount : (Maybe String -> msg) -> Sub msg
 
 
-port pay : { amount : Float, donee : String } -> Cmd msg
+port pay : { amount : String, donee : String } -> Cmd msg
 
 
 port paying : (() -> msg) -> Sub msg
@@ -118,7 +119,7 @@ type Msg
     | Donee String
     | ValidAddress { input : String, valid : Bool }
     | SelectedAccount (Maybe String)
-    | Pay Float String
+    | Pay String String
       -- TxHash is paying
     | TxHash ()
       -- Receipt is paid
@@ -172,14 +173,23 @@ update msg model =
                             Nothing
 
                         _ ->
-                            let
-                                amount =
-                                    Result.withDefault 0 (String.toFloat input)
-                            in
-                                if amount > 0 then
-                                    Just amount
-                                else
-                                    Nothing
+                            Just
+                                { input = input
+                                , decimal =
+                                    let
+                                        amount =
+                                            Dec.fromString input
+                                    in
+                                        case amount of
+                                            Just amount ->
+                                                if Dec.gt amount Dec.zero then
+                                                    Valid amount
+                                                else
+                                                    Invalid "amount"
+
+                                            Nothing ->
+                                                Invalid "amount"
+                                }
               }
             , Cmd.none
             )
@@ -282,14 +292,19 @@ form model percent =
         Just NonPayee ->
             case model.amount of
                 Just amount ->
-                    fields percent model.donee
-                        ++ (case model.donee of
-                                Just (Valid donee) ->
-                                    [ button [ onClick (Pay amount donee) ] [ text "OK" ] ]
+                    case amount.decimal of
+                        Valid _ ->
+                            fields percent model.donee
+                                ++ (case model.donee of
+                                        Just (Valid donee) ->
+                                            [ button [ onClick (Pay amount.input donee) ] [ text "OK" ] ]
 
-                                _ ->
-                                    disabledButton
-                           )
+                                        _ ->
+                                            disabledButton
+                                   )
+
+                        _ ->
+                            disabledForm percent model.donee
 
                 Nothing ->
                     disabledForm percent model.donee
