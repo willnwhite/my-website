@@ -39,7 +39,7 @@ type alias Model =
     { ethereum : Bool
     , payee : String
     , selectedAccount : Maybe SelectedAccount
-    , percent : Maybe Float
+    , percent : Maybe String
     , payment : Payment
     , amount : Maybe { input : String, decimal : Valid Decimal }
     , donee : Maybe (Valid String)
@@ -148,22 +148,7 @@ update msg model =
                 ( { model | ethereum = False }, Cmd.none )
 
         GotPercent percent ->
-            let
-                percentToFloatResult =
-                    String.toFloat percent
-            in
-                ( { model
-                    | percent =
-                        case percentToFloatResult of
-                            Ok percent ->
-                                Just percent
-
-                            Err _ ->
-                                Nothing
-                        -- FIXME Nothing means that Error appears to user same as before percent is known ("getting %")
-                  }
-                , Cmd.none
-                )
+            ( { model | percent = Just percent }, Cmd.none )
 
         Amount input ->
             ( { model
@@ -335,13 +320,13 @@ doneeInput percent donee =
     label [ style [ ( "display", "block" ) ] ]
         (case donee of
             Just (Invalid reason) ->
-                [ text ("donate " ++ (toString percent) ++ "% to ")
+                [ text ("donate " ++ percent ++ "% to ")
                 , input [ type_ "text", placeholder "Ethereum address", onInput Donee ] []
                 , text ("invalid " ++ reason)
                 ]
 
             _ ->
-                [ text ("donate " ++ (toString percent) ++ "% to ")
+                [ text ("donate " ++ percent ++ "% to ")
                 , input [ type_ "text", placeholder "Ethereum address", onInput Donee ] []
                 ]
         )
