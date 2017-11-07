@@ -68,19 +68,25 @@ window.addEventListener("load", function() {
 
   app.ports.pay.subscribe(async ({ amount, donee }) => {
     const contract = new web3.eth.Contract(abi, contractAddress);
+    const payer = (await web3.eth.getAccounts())[0];
     contract.methods
       .payAndDonate(payee, donee)
       .send({
-        from: (await web3.eth.getAccounts())[0],
+        from: payer,
         value: web3.utils.toWei(amount, "ether")
       })
       .on("transactionHash", _ => app.ports.paying.send(null))
-      .on("receipt", receipt =>
+      .on("receipt", async receipt => {
+        const message =
+          "This will prove that you own the paying account without revealing your private key.";
         app.ports.paid.send({
           txHash: receipt.transactionHash,
-          signature: { signature: "0x...", msg: "message" } // NOTE "Many of these functions send sensitive information, like password. Never call these functions over a unsecured Websocket or HTTP provider, as your password will be send in plain text!" http://web3js.readthedocs.io/en/1.0/web3-eth-personal.html?highlight=sign#web3-eth-personal QUESTION Does MetaMask take care of this?
-        })
-      );
+          signature: {
+            signature: await web3.eth.personal.sign(message, payer),
+            message
+          } // NOTE "Many of these functions send sensitive information, like password. Never call these functions over a unsecured Websocket or HTTP provider, as your password will be send in plain text!" http://web3js.readthedocs.io/en/1.0/web3-eth-personal.html?highlight=sign#web3-eth-personal QUESTION Does MetaMask take care of this? What about fallback nodes? Are they secure?
+        });
+      });
   });
 
   app.ports.portsReady.send(null);

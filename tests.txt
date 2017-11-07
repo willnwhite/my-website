@@ -3,7 +3,7 @@ Y part:
 "Unlock MetaMask" and inputs disabled if MetaMask locked.
 Should donate to the in-put donee.
 Should pay the in-put amount.
-OK button (with Pay msg) shouldn't appear unless: amount is valid, donee is valid, payee isn't selected in MetaMask.
+OK button (with Pay msg) should be disabled (and without Pay msg) unless: amount is valid, donee is valid, payee isn't selected in MetaMask.
 No input fields should appear until percent is got.
 No input fields should appear unless percent is valid.
 "invalid address" if donee address is invalid.
@@ -11,6 +11,11 @@ No input fields should appear unless percent is valid.
 "Payee can't pay payee" if payee account selected in MetaMask.
 receipt "transaction: signature: message:" after payment
 Can save receipt to file.
+error msgs in same place, unless specific to input field
+input field error msgs near input field
+can't donate to payee.
+"Cheaper to pay payee directly than to donate to them." when trying to donate to payee.
+percent refreshes when network changes in MetaMask
 
 rest of website:
 pay inputs only visible after clicking on pay.

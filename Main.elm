@@ -17,12 +17,17 @@ main =
 type Payment
     = Unpaid
     | Paying
-    | Paid String { signature : String, msg : String }
+    | Paid String { signature : String, message : String }
 
 
 type SelectedAccount
     = Payee
     | NonPayee
+
+
+type Valid
+    = Valid String
+    | Invalid String
 
 
 
@@ -36,7 +41,7 @@ type alias Model =
     , percent : Maybe Float
     , payment : Payment
     , amount : Maybe Float
-    , donee : Maybe String
+    , donee : Maybe Valid
     }
 
 
@@ -85,7 +90,7 @@ port pay : { amount : Float, donee : String } -> Cmd msg
 port paying : (() -> msg) -> Sub msg
 
 
-port paid : ({ txHash : String, signature : { signature : String, msg : String } } -> msg) -> Sub msg
+port paid : ({ txHash : String, signature : { signature : String, message : String } } -> msg) -> Sub msg
 
 
 
@@ -117,7 +122,7 @@ type Msg
       -- TxHash is paying
     | TxHash ()
       -- Receipt is paid
-    | Receipt { txHash : String, signature : { signature : String, msg : String } }
+    | Receipt { txHash : String, signature : { signature : String, message : String } }
 
 
 
@@ -190,10 +195,12 @@ update msg model =
         ValidAddress { input, valid } ->
             ( { model
                 | donee =
-                    if valid then
-                        Just input
+                    if valid && String.toLower input /= model.payee then
+                        Just (Valid input)
+                    else if String.toLower input == model.payee then
+                        Just (Invalid "donee")
                     else
-                        Nothing
+                        Just (Invalid "address")
               }
             , Cmd.none
             )
@@ -230,7 +237,7 @@ update msg model =
             ( { model | payment = Paying }, Cmd.none )
 
         Receipt { txHash, signature } ->
-            ( { model | payment = Paid txHash { signature = signature.signature, msg = signature.msg } }, Cmd.none )
+            ( { model | payment = Paid txHash { signature = signature.signature, message = signature.message } }, Cmd.none )
 
 
 
@@ -242,45 +249,7 @@ view model =
     div []
         [ div [] [ h3 [] [ a [ href "mailto:w.white9@icloud.com" ] [ text "email" ] ] ]
         , div [] [ h3 [] [ text "pay" ] ]
-        , div []
-            (case model.ethereum of
-                False ->
-                    [ text "Install MetaMask" ]
-
-                True ->
-                    case model.percent of
-                        Nothing ->
-                            [ text "getting %" ]
-
-                        Just percent ->
-                            case model.payment of
-                                Unpaid ->
-                                    case model.selectedAccount of
-                                        Just NonPayee ->
-                                            case model.amount of
-                                                Just amount ->
-                                                    case model.donee of
-                                                        Just donee ->
-                                                            fields percent ++ [ button [ onClick (Pay amount donee) ] [ text "OK" ] ]
-
-                                                        Nothing ->
-                                                            fields percent
-
-                                                Nothing ->
-                                                    fields percent
-
-                                        Just Payee ->
-                                            [ div [] [ text "Payee's account selected in MetaMask. Switch account." ] ] ++ fields percent
-
-                                        Nothing ->
-                                            [ div [] [ text "Unlock MetaMask" ] ] ++ fields percent
-
-                                Paying ->
-                                    [ text "paying" ]
-
-                                Paid txHash { signature, msg } ->
-                                    [ text ("paid: receipt: transaction: " ++ txHash ++ " signature: " ++ signature ++ " msg: " ++ msg) ]
-            )
+        , div [] (y model)
         ]
 
 
@@ -288,11 +257,76 @@ view model =
 -- VIEW HELPERS
 
 
-fields percent =
+y model =
+    if model.ethereum then
+        case model.percent of
+            Nothing ->
+                [ text "getting %" ]
+
+            Just percent ->
+                case model.payment of
+                    Unpaid ->
+                        form model percent
+
+                    Paying ->
+                        [ text "paying" ]
+
+                    Paid txHash { signature, message } ->
+                        [ text ("paid: Save this receipt: transaction: " ++ txHash ++ " signature: " ++ signature ++ " message: " ++ message) ]
+    else
+        [ text "Install MetaMask" ]
+
+
+form model percent =
+    case model.selectedAccount of
+        Just NonPayee ->
+            case model.amount of
+                Just amount ->
+                    fields percent model.donee
+                        ++ (case model.donee of
+                                Just (Valid donee) ->
+                                    [ button [ onClick (Pay amount donee) ] [ text "OK" ] ]
+
+                                _ ->
+                                    disabledButton
+                           )
+
+                Nothing ->
+                    disabledForm percent model.donee
+
+        Just Payee ->
+            [ div [] [ text "Payee's account selected in MetaMask. Switch account." ] ] ++ disabledForm percent model.donee
+
+        Nothing ->
+            [ div [] [ text "Unlock MetaMask" ] ] ++ disabledForm percent model.donee
+
+
+disabledForm percent donee =
+    fields percent donee ++ disabledButton
+
+
+disabledButton =
+    [ button [ disabled True ] [ text "OK" ] ]
+
+
+fields percent donee =
     [ label [ style [ ( "display", "block" ) ] ]
         [ text "amount ", input [ type_ "number", Html.Attributes.min "0", onInput Amount ] [], text " ETH" ]
-    , label [ style [ ( "display", "block" ) ] ]
-        [ text ("donate " ++ (toString percent) ++ "% to ")
-        , input [ type_ "text", placeholder "Ethereum address", onInput Donee ] []
-        ]
+    , doneeInput percent donee
     ]
+
+
+doneeInput percent donee =
+    label [ style [ ( "display", "block" ) ] ]
+        (case donee of
+            Just (Invalid reason) ->
+                [ text ("donate " ++ (toString percent) ++ "% to ")
+                , input [ type_ "text", placeholder "Ethereum address", onInput Donee ] []
+                , text ("invalid " ++ reason)
+                ]
+
+            _ ->
+                [ text ("donate " ++ (toString percent) ++ "% to ")
+                , input [ type_ "text", placeholder "Ethereum address", onInput Donee ] []
+                ]
+        )
