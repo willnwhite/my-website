@@ -9,14 +9,16 @@ No input fields should appear unless percent is valid.
 "invalid address" if donee address is invalid.
 "invalid amount" if amount is invalid.
 "Payee can't pay payee" if payee account selected in MetaMask.
-receipt "transaction: signature: message:" after payment
-Can save receipt to file.
-error msgs in same place, unless specific to input field
-input field error msgs near input field
+error msgs in same place, next to OK button, unless specific to input field
+input field error msgs next to input field
 can't donate to payee.
 "Cheaper to pay payee directly than to donate to them." when trying to donate to payee.
 percent refreshes when network changes in MetaMask
 "amount is invalid" if can't convert to Decimal
+receipt "transaction: signature: message:" after payment
+Explanation of signing message before MetaMask confirmation dialog pops up.
+Message identifies payee, e.g. domain name.
+Can save receipt to file.
 
 rest of website:
 pay inputs only visible after clicking on pay.

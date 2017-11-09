@@ -26,7 +26,7 @@ type SelectedAccount
     | NonPayee
 
 
-type Valid a
+type Validity a
     = Valid a
     | Invalid String
 
@@ -41,8 +41,8 @@ type alias Model =
     , selectedAccount : Maybe SelectedAccount
     , percent : Maybe String
     , payment : Payment
-    , amount : Maybe { input : String, decimal : Valid Decimal }
-    , donee : Maybe (Valid String)
+    , amount : Maybe (Validity String)
+    , donee : Maybe (Validity String)
     }
 
 
@@ -76,10 +76,16 @@ port getPercent : () -> Cmd msg
 port gotPercent : (String -> msg) -> Sub msg
 
 
-port validateAddress : String -> Cmd msg
+port validateAmount : String -> Cmd msg
 
 
-port validAddress : ({ input : String, valid : Bool } -> msg) -> Sub msg
+port amountValidity : ({ value : String, validity : String } -> msg) -> Sub msg
+
+
+port validateDoneeAddress : String -> Cmd msg
+
+
+port doneeAddressValidity : ({ value : String, validity : String } -> msg) -> Sub msg
 
 
 port selectedAccount : (Maybe String -> msg) -> Sub msg
@@ -103,7 +109,8 @@ subscriptions model =
         [ portsReady PortsReady
         , ethereum Ethereum
         , gotPercent GotPercent
-        , validAddress ValidAddress
+        , amountValidity AmountValidity
+        , doneeAddressValidity DoneeAddressValidity
         , selectedAccount SelectedAccount
         , paying TxHash
         , paid Receipt
@@ -117,7 +124,8 @@ type Msg
     | GotPercent String
     | Amount String
     | Donee String
-    | ValidAddress { input : String, valid : Bool }
+    | AmountValidity { value : String, validity : String }
+    | DoneeAddressValidity { value : String, validity : String }
     | SelectedAccount (Maybe String)
     | Pay String String
       -- TxHash is paying
@@ -151,30 +159,24 @@ update msg model =
             ( { model | percent = Just percent }, Cmd.none )
 
         Amount input ->
+            case input of
+                "" ->
+                    ( { model | amount = Nothing }, Cmd.none )
+
+                _ ->
+                    ( model, validateAmount input )
+
+        AmountValidity { value, validity } ->
             ( { model
                 | amount =
-                    case input of
-                        "" ->
-                            Nothing
+                    Just
+                        (case validity of
+                            "valid" ->
+                                Valid value
 
-                        _ ->
-                            Just
-                                { input = input
-                                , decimal =
-                                    let
-                                        amount =
-                                            Dec.fromString input
-                                    in
-                                        case amount of
-                                            Just amount ->
-                                                if Dec.gt amount Dec.zero then
-                                                    Valid amount
-                                                else
-                                                    Invalid "amount"
-
-                                            Nothing ->
-                                                Invalid "amount"
-                                }
+                            _ ->
+                                Invalid "amount"
+                        )
               }
             , Cmd.none
             )
@@ -185,17 +187,19 @@ update msg model =
                     ( { model | donee = Nothing }, Cmd.none )
 
                 _ ->
-                    ( model, validateAddress input )
+                    ( model, validateDoneeAddress input )
 
-        ValidAddress { input, valid } ->
+        DoneeAddressValidity { value, validity } ->
             ( { model
                 | donee =
-                    if valid && String.toLower input /= model.payee then
-                        Just (Valid input)
-                    else if String.toLower input == model.payee then
-                        Just (Invalid "donee")
-                    else
-                        Just (Invalid "address")
+                    Just
+                        (case validity of
+                            "valid" ->
+                                Valid value
+
+                            _ ->
+                                Invalid "address or donee"
+                        )
               }
             , Cmd.none
             )
@@ -276,22 +280,17 @@ form model percent =
     case model.selectedAccount of
         Just NonPayee ->
             case model.amount of
-                Just amount ->
-                    case amount.decimal of
-                        Valid _ ->
-                            fields percent model.donee
-                                ++ (case model.donee of
-                                        Just (Valid donee) ->
-                                            [ button [ onClick (Pay amount.input donee) ] [ text "OK" ] ]
+                Just (Valid amount) ->
+                    fields percent model.donee
+                        ++ (case model.donee of
+                                Just (Valid donee) ->
+                                    [ button [ onClick (Pay amount donee) ] [ text "OK" ] ]
 
-                                        _ ->
-                                            disabledButton
-                                   )
+                                _ ->
+                                    disabledButton
+                           )
 
-                        _ ->
-                            disabledForm percent model.donee
-
-                Nothing ->
+                _ ->
                     disabledForm percent model.donee
 
         Just Payee ->

@@ -1,7 +1,5 @@
 import babel_polyfill from "babel-polyfill"; // TODO move into configuration file (it's only here because I've chosen to use ES2015+)
 import Web3 from "web3";
-import abi from "./contract/Y_sol_Y.abi"; // FIXME manual build step: having to rename ABI file extension to .abi.json by hand
-import bigRat from "big-rational";
 
 // const web3 = new Web3(Web3.givenProvider); // from web3 v1 docs
 
@@ -19,14 +17,6 @@ window.addEventListener("load", function() {
   }
 
   // Now you can start your app & access web3 freely:
-
-  // Rinkeby
-  // const contractAddress = "0xF4C3aC68Af170E71D2CDFcd3e04964053827A2f8"; // contract address on Rinkeby QUESTION This is a checksum address (has capitals). What's a checksum address for?
-  // const payee = "0xa751fDbcBE2c6Cdcb9aCa517789C3974f930587c"; // NOTE Rinkeby address, not main net
-
-  // testrpc
-  const contractAddress = "0xe0805a8d107c45625a624b5284915C0A45F85d5e";
-  const payee = "0x15be789665c03105c81130d884d5fa223d6f1260";
 
   const app = Elm.Main.embed(document.getElementById("main"), {
     ethereum: typeof web3 !== "undefined",
@@ -46,48 +36,111 @@ window.addEventListener("load", function() {
   }
 
   app.ports.getPercent.subscribe(async () => {
-    const contract = new web3.eth.Contract(abi, contractAddress);
+    app.ports.gotPercent.send(await getPercent());
+  });
+
+  app.ports.validateAmount.subscribe(input =>
+    app.ports.amountValidity.send({
+      value: input,
+      validity: etherValidity(input)
+    })
+  );
+
+  app.ports.validateDoneeAddress.subscribe(input =>
+    app.ports.doneeAddressValidity.send({
+      value: input,
+      validity: doneeAddressValidity(payee)(input)
+    })
+  );
+
+  app.ports.pay.subscribe(({ amount, donee }) => {
+    payAndDonate(
+      amount,
+      donee,
+      () => app.ports.paying.send(null),
+      receiptForUser => app.ports.paid.send(receiptForUser)
+    ); // change payAndDonate to promises, or PromiEvents, rather than callbacks.
+  });
+
+  app.ports.portsReady.send(null);
+
+  // Y.js
+  // must have the right version of web3, so must come after window's "load" event
+
+  const contract = new web3.eth.Contract(abi, contractAddress); // Y.js Should come with abi and contractAddress installed for now... see if initialising Y.js with them is necessary when per-payee Y.sol is actually demanded.
+
+  const getPercent = async () => {
     const numAndDenom = await Promise.all([
       contract.methods.nums(payee).call(),
       contract.methods.denoms(payee).call() // NOTE two calls here. Does using a struct for num and denom (one call) cost more gas to set? UPDATE: It's about whether payAndDonate is cheaper or not, as that's the most frequent.
     ]);
-    app.ports.gotPercent.send(
-      bigRat(numAndDenom[0], numAndDenom[1])
-        .multiply(100) // 7% -> 7
-        .toDecimal()
-    );
-  });
 
-  // call validAddress only if address is valid
-  app.ports.validateAddress.subscribe(input =>
-    app.ports.validAddress.send({
-      input,
-      valid: web3.utils.isAddress(input)
-    })
-  );
+    return bigRat(numAndDenom[0], numAndDenom[1])
+      .multiply(100) // 7% -> 7
+      .toDecimal();
+  };
 
-  app.ports.pay.subscribe(async ({ amount, donee }) => {
-    const contract = new web3.eth.Contract(abi, contractAddress);
-    const payer = (await web3.eth.getAccounts())[0];
-    contract.methods
-      .payAndDonate(payee, donee)
-      .send({
-        from: payer,
-        value: web3.utils.toWei(amount, "ether")
-      })
-      .on("transactionHash", _ => app.ports.paying.send(null))
-      .on("receipt", async receipt => {
-        const message =
-          "This will prove that you own the paying account without revealing your private key.";
-        app.ports.paid.send({
-          txHash: receipt.transactionHash,
-          signature: {
-            signature: await web3.eth.personal.sign(message, payer),
-            message
-          } // NOTE "Many of these functions send sensitive information, like password. Never call these functions over a unsecured Websocket or HTTP provider, as your password will be send in plain text!" http://web3js.readthedocs.io/en/1.0/web3-eth-personal.html?highlight=sign#web3-eth-personal QUESTION Does MetaMask take care of this? What about fallback nodes? Are they secure?
-        });
-      });
-  });
+  const payAndDonate = async (
+    amount,
+    donee,
+    txHashCallback,
+    receiptCallback
+  ) => {
+    switch (doneeAddressValidity(payee)(donee)) {
+      case valid:
+        const payer = (await web3.eth.getAccounts())[0];
+        contract.methods
+          .payAndDonate(payee, donee)
+          .send({
+            from: payer,
+            value: web3.utils.toWei(amount, "ether")
+          })
+          .on("transactionHash", txHashCallback)
+          .on("receipt", async receipt => {
+            const message =
+              "Signing this message will mean you can prove to the payee (" +
+              location.origin +
+              ") that you're the owner of the paying account without revealing your private key to them."; // initialise Y.js with this (the domain name will be unique to the website
 
-  app.ports.portsReady.send(null);
+            receiptCallback({
+              txHash: receipt.transactionHash,
+              signature: {
+                signature: await web3.eth.personal.sign(message, payer), // TODO Y.js user shouldn't have to deal with web3.
+                message
+              } // NOTE "Many of these functions send sensitive information, like password. Never call these functions over a unsecured Websocket or HTTP provider, as your password will be send in plain text!" http://web3js.readthedocs.io/en/1.0/web3-eth-personal.html?highlight=sign#web3-eth-personal QUESTION Does MetaMask take care of this? What about fallback nodes? Are they secure?
+            });
+          });
+        break;
+      case invalid:
+        break;
+      default:
+    }
+  };
 });
+
+// Y.js
+
+import abi from "./contract/Y_sol_Y.abi"; // FIXME manual build step: having to rename ABI file extension to .abi.json by hand
+import BigNumber from "bignumber.js";
+import bigRat from "big-rational";
+// validation functions for overlying app. // return "valid" or "invalid", not true or false (loss of information, https://youtu.be/6TDKHGtAxeg)
+
+const valid = "valid",
+  invalid = "invalid";
+
+const etherValidity = ether =>
+  new BigNumber(ether).greaterThan(0) ? valid : invalid; // "0.111111111111111111111111111111111111111" isn't valid: mustn't have > 18 d.p.
+
+// const validityOfWei = wei => ;
+
+// initialise Y.js with payee address
+const doneeAddressValidity = payee => donee =>
+  web3.utils.isAddress(donee) && donee !== payee ? valid : invalid;
+
+// Rinkeby
+// const contractAddress = "0xF4C3aC68Af170E71D2CDFcd3e04964053827A2f8"; // contract address on Rinkeby QUESTION This is a checksum address (has capitals). What's a checksum address for?
+// const payee = "0xa751fDbcBE2c6Cdcb9aCa517789C3974f930587c"; // NOTE Rinkeby address, not main net
+
+// testrpc
+const contractAddress = "0xe0805a8d107c45625a624b5284915C0A45F85d5e";
+const payee = "0x15be789665c03105c81130d884d5fa223d6f1260";
